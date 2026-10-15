@@ -1,16 +1,13 @@
 import logging
 from typing import final, override
 
-import dotenv
-
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Header, Footer, Static, ProgressBar, Label
+from textual.widgets import Static, ProgressBar, Label
 
-_ = dotenv.load_dotenv()
 
-from projects import dark_smp, statalytics
-from projects.style import Color
+from .projects import dark_smp, statalytics
+from .projects.style import Color
 
 
 logging.basicConfig(
@@ -83,5 +80,10 @@ class ServiceDashboard(App[None]):
 
 
 app = ServiceDashboard()
-if __name__ == "__main__":
+
+def main() -> None:
     app.run()
+
+
+if __name__ == "__main__":
+    main()
