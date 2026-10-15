@@ -37,10 +37,6 @@
         in
         {
           default = app;
-          # app.${system}.default = {
-          #   type = "app";
-          #   program = "${app}/bin/lucism_monitor_tui";
-          # };
         }
       );
     };

@@ -1,10 +1,21 @@
 import logging
+import argparse
+from pathlib import Path
 from typing import final, override
 
 from textual.app import App, ComposeResult
 from textual.containers import Container
 from textual.widgets import Static, ProgressBar, Label
+from dotenv import load_dotenv
 
+parser = argparse.ArgumentParser()
+_ = parser.add_argument("--env-file", type=Path, help="Path to a .env file")
+args = parser.parse_args()
+
+if args.env_file:
+    if not args.env_file.is_file():
+        parser.error(f"env file not found: {args.env_file}")
+    _ = load_dotenv(args.env_file, override=False)
 
 from .projects import dark_smp, statalytics
 from .projects.style import Color
