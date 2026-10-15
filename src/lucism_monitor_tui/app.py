@@ -23,7 +23,7 @@ from .projects.style import Color
 
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[logging.FileHandler("tui.log")],
+    # handlers=[logging.FileHandler("tui.log")],
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
