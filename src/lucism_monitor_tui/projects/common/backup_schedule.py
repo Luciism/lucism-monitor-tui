@@ -79,11 +79,11 @@ async def update_backup_schedule_labels(
     self: ProjectCardWithBackupSchedule,
 ) -> None:
         try:
-            self.logger.info("Starting to fetch backup schedule")
+            self.logger.debug("Starting to fetch backup schedule")
             backup_schedule = await BackupSchedule.fetch_backup_schedule(
                 self.backup_api_base_url, self.backup_api_key
             )
-            self.logger.info("Backup schedule fetched")
+            self.logger.debug("Backup schedule fetched")
         except ClientError as exc:
             self.logger.error("Failed to get backup schedule", exc_info=exc)
             msg = "Fetch failed"
