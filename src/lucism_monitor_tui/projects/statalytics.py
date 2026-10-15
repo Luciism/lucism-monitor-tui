@@ -24,8 +24,9 @@ STATALYTICS_BACKUPS_API_KEY = get_and_assert_env("STATALYTICS_BACKUPS_API_KEY")
 
 SERVICES = [
     DetailLabelEntry(id="bot", name="Bot", icon="󰚩"),
-    DetailLabelEntry(id="website", name="Website", icon=""),
+    DetailLabelEntry(id="trackers", name="Trackers", icon=""),
     DetailLabelEntry(id="utils", name="Utils", icon=""),
+    DetailLabelEntry(id="website", name="Website", icon=""),
     DetailLabelEntry(id="renderer", name="Renderer", icon="󰋩"),
     DetailLabelEntry(id="redis", name="Redis", icon=""),
     DetailLabelEntry(id="skins", name="Skins", icon=""),

@@ -15,6 +15,7 @@
 *.log
 
 # Secrets
+*.env*
 **/.env
 **/secret/
 **/secrets/
