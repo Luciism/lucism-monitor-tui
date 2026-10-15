@@ -1,0 +1,20 @@
+# Python-generated files
+**/__pycache__/
+*.py[oc]
+**/build/
+**/dist/
+**/wheels/
+*.egg-info
+
+**/.dev/
+**/test.py
+
+# Virtual environments
+**/.venv
+
+*.log
+
+# Secrets
+**/.env
+**/secret/
+**/secrets/
