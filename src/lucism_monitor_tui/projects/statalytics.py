@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from datetime import datetime
 from typing import final, override
 
@@ -12,8 +11,14 @@ from textual.widgets import Label
 from .common.environment import get_and_assert_env
 
 from .style import Color
-from .project_card import ProjectCardBase, DetailLabelEntry, build_detail_label, LabelWrapper
 from .common.backup_schedule import update_backup_schedule_labels
+from .project_card import (
+    ProjectCardBase,
+    DetailLabelEntry,
+    build_detail_label,
+    LabelWrapper,
+    ServiceStatus
+)
 
 STATALYTICS_HEALTH_API_BASE_URL = get_and_assert_env("STATALYTICS_HEALTH_API_BASE_URL")
 STATALYTICS_HEALTH_API_KEY = get_and_assert_env("STATALYTICS_HEALTH_API_KEY")
@@ -32,24 +37,6 @@ SERVICES = [
     DetailLabelEntry(id="skins", name="Skins", icon=""),
 ]
 
-
-@dataclass
-class ServiceStatus:
-    healthy: bool
-    status: str
-    color: str
-
-    @staticmethod
-    def as_healthy() -> 'ServiceStatus':
-        return ServiceStatus(healthy=True, status="Running", color=Color.Running.value)
-
-    @staticmethod
-    def as_unhealthy() -> 'ServiceStatus':
-        return ServiceStatus(healthy=False, status="Offline", color=Color.Offline.value)
-
-    @staticmethod
-    def as_loading() -> 'ServiceStatus':
-        return ServiceStatus(healthy=False, status="Fetching...", color=Color.Loading.value)
 
 @final
 class ProjectCard(ProjectCardBase):

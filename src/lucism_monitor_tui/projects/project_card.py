@@ -71,3 +71,23 @@ class LabelWrapper:
     @property
     def label(self) -> Label:
         return self._label
+
+@dataclass
+class ServiceStatus:
+    healthy: bool
+    status: str
+    color: str
+
+    @staticmethod
+    def as_healthy() -> 'ServiceStatus':
+        return ServiceStatus(healthy=True, status="Running", color=Color.Running.value)
+
+    @staticmethod
+    def as_unhealthy() -> 'ServiceStatus':
+        return ServiceStatus(healthy=False, status="Offline", color=Color.Offline.value)
+
+    @staticmethod
+    def as_loading() -> 'ServiceStatus':
+        return ServiceStatus(healthy=False, status="Fetching...", color=Color.Loading.value)
+
+
