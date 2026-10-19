@@ -17,7 +17,7 @@ if args.env_file:
         parser.error(f"env file not found: {args.env_file}")
     _ = load_dotenv(args.env_file, override=False)
 
-from .projects import dark_smp, statalytics
+from .projects import dark_smp, statalytics, enotify
 from .projects.style import Color
 
 
@@ -87,6 +87,7 @@ class ServiceDashboard(App[None]):
         with Container(id="grid"):
             yield statalytics.ProjectCard()
             yield dark_smp.ProjectCard()
+            yield enotify.ProjectCard()
 
         # yield Footer()
 
