@@ -32,7 +32,7 @@ SERVICES = [
     DetailLabelEntry(id="api", name="API", icon="󰞵"),
     DetailLabelEntry(id="website", name="Website", icon=""),
     DetailLabelEntry(id="database", name="Database", icon=""),
-    # DetailLabelEntry(id="linking_server", name="Linking Server", icon="󰍳"),
+    DetailLabelEntry(id="linking_server", name="Linking Server", icon="󰍳"),
 ]
 
 @final
