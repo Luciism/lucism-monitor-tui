@@ -5,14 +5,15 @@ from typing import final, override
 from aiohttp import ClientError
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import Container, Vertical
+from textual.widgets import Static
 
 from .common.backup_schedule import update_backup_schedule_labels
 
 from .common.mc_metrics import McServerMetrics
 from .common.environment import get_and_assert_env
 from .style import Color
-from .project_card import ProjectCardBase, LabelWrapper, DetailLabelEntry
+from .project_card import ProjectCardBase, LabelWrapper, DetailLabelEntry, SectionHeading
 
 
 DARK_SMP_METRICS_SERVER_BASE_URL = get_and_assert_env("DARK_SMP_METRICS_SERVER_BASE_URL")
@@ -35,6 +36,9 @@ class ProjectCard(ProjectCardBase):
         self.update_interval_secs = 5
         self.next_backup_time: datetime | None = None
 
+        self.metrics_section_heading = SectionHeading("Metrics")
+        self.backups_section_heading = SectionHeading("Backups")
+
         self.status_label = LabelWrapper(DetailLabelEntry("status", "Status", ""))
         self.uptime_label = LabelWrapper(DetailLabelEntry("uptime", "Uptime", "󰥔"))
         self.tps_label = LabelWrapper(DetailLabelEntry("tps", "TPS", "󰓅"))
@@ -50,7 +54,9 @@ class ProjectCard(ProjectCardBase):
 
     @override
     def compose(self) -> ComposeResult:
-        with Container():
+        yield self.metrics_section_heading
+
+        with Vertical(classes="section-a"):
             yield self.status_label.set_loading()
             yield self.tps_label.set_loading()
             yield self.memory_label.set_loading()
@@ -58,9 +64,14 @@ class ProjectCard(ProjectCardBase):
             yield self.players_label.set_loading()
             yield self.loaded_chunks_label.set_loading()
 
-        yield self.last_backup_status_label.set_loading()
-        yield self.last_backup_attempt_label.set_loading()
-        yield self.next_backup_label.set_loading()
+
+        yield self.backups_section_heading
+        with Vertical():
+            yield self.last_backup_status_label.set_loading()
+            yield self.last_backup_attempt_label.set_loading()
+            yield self.next_backup_label.set_loading()
+
+        yield Static("", classes="vertical-spacer")
 
     @work
     async def on_mount(self) -> None:
@@ -111,7 +122,8 @@ class ProjectCard(ProjectCardBase):
 
     async def update_info(self) -> None:
         await self.update_server_metrics()
-        await update_backup_schedule_labels(self)
+        _ = await update_backup_schedule_labels(self)
 
         now = datetime.now()
-        self.set_last_updated_at(now.strftime("%H:%M"))
+        self.metrics_section_heading.set_updated_at(now)
+        self.backups_section_heading.set_updated_at(now)

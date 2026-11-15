@@ -32,6 +32,7 @@
               pydantic
               python-dotenv
               textual
+              websocket-client
             ];
           };
         in

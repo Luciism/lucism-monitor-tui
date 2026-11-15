@@ -5,7 +5,7 @@ from typing import final, override
 
 from textual.app import App, ComposeResult
 from textual.containers import Container
-from textual.widgets import Static, ProgressBar, Label
+from textual.widgets import Button, Static, ProgressBar, Label
 from dotenv import load_dotenv
 
 parser = argparse.ArgumentParser()
@@ -23,8 +23,8 @@ from .projects.style import Color
 
 logging.basicConfig(
     level=logging.INFO,
-    handlers=[],
-    # handlers=[logging.FileHandler("tui.log")],
+    # handlers=[],
+    handlers=[logging.FileHandler("tui.log")],
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
@@ -61,7 +61,7 @@ class ServiceDashboard(App[None]):
         Screen {{
             background: {Color.Background.value};
         }}
-        ProjectCard, PlaceholderServiceCard {{
+        ProjectCard, PlaceholderServiceCard, ProjectCardBase {{
             border: round {Color.Loading.value};
             padding: 1 2;
             height: auto;
@@ -72,11 +72,84 @@ class ServiceDashboard(App[None]):
         }}
         #grid {{
             layout: grid;
-            grid-size: 2;
+            grid-size: 4;
             grid-gutter: 1;
         }}
 
+        .detail-label-horizontal {{
+            width: 100%;
+            height: auto;
+        }}
+
+        Rule {{
+            margin: 0 0;
+            height: 2;
+            color: {Color.Primary.value};
+        }}
+
+        .rule-label {{
+            color: {Color.Primary.value};
+            text-style: italic;
+        }}
+
+        .rule-labels-horizontal {{
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: auto;
+        }}
+
+        .horizontal-spacer {{
+            width: 1fr;
+        }}
+
+        .vertical-spacer {{
+            height: 1fr;
+        }}
+
+        .vertical-spacer-small {{
+            height: 3;
+        }}
+
+        Vertical, Horizontal {{
+            height: auto;
+        }}
+
+        .pre-selected-button {{
+            border: none;
+            height: 0;
+            width: 0;
+        }}
+
+        Button {{
+            width: 1fr;
+            height: 3;
+            background: transparent;
+            border: round {Color.Accent.value};
+        }}
+
+        .project-card-logs {{
+            height: 1fr;
+            min-height: 6;
+            margin: 1 0;
+            padding: 0 1;
+            color: {Color.Loading.value};
+            background: {Color.Surface.value};
+            border: round {Color.Loading.value};
+            scrollbar-size: 0 0;
+        }}
+
+        .section-a {{
+            height: 10;
+        }}
+        .section-b {{
+            # position: relative;
+            # offset: 0 14;
+            # background: red;
+        }}
+        
         {Color.border_classes()}
+        {Color.bg_classes()}
     """
 
     BINDINGS = [("^q", "quit", "Quit")]
@@ -84,6 +157,7 @@ class ServiceDashboard(App[None]):
     @override
     def compose(self) -> ComposeResult:
         # yield Header(show_clock=True)
+        yield Button("", classes="pre-selected-button")
         with Container(id="grid"):
             yield statalytics.ProjectCard()
             yield islestats.ProjectCard()

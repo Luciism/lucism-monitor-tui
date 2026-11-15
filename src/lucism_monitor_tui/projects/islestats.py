@@ -5,8 +5,8 @@ from typing import final, override
 from aiohttp import ClientSession, ClientError
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Container
-from textual.widgets import Label
+from textual.containers import Container, Vertical
+from textual.widgets import Label, Static
 
 from .common.backup_schedule import update_backup_schedule_labels
 from .common.environment import get_and_assert_env
@@ -15,6 +15,7 @@ from .style import Color
 from .project_card import (
     ProjectCardBase,
     DetailLabelEntry,
+    SectionHeading,
     build_detail_label,
     LabelWrapper,
     ServiceStatus
@@ -50,6 +51,9 @@ class ProjectCard(ProjectCardBase):
             service.id: LabelWrapper(service) for service in SERVICES
         }
 
+        self.services_section_heading = SectionHeading("Services")
+        self.backups_section_heading = SectionHeading("Backups")
+
         self.last_backup_status_label = LabelWrapper(
             DetailLabelEntry("last_backup_status", "Last Backup Status", ""))
         self.last_backup_attempt_label = LabelWrapper(
@@ -58,13 +62,20 @@ class ProjectCard(ProjectCardBase):
 
     @override
     def compose(self) -> ComposeResult:
-        with Container():
+        yield self.services_section_heading
+        with Vertical(classes="section-a"):
             for service in SERVICES:
                 yield self.service_labels[service.id].set_loading()
 
-        yield self.last_backup_status_label.set_loading()
-        yield self.last_backup_attempt_label.set_loading()
-        yield self.next_backup_label.set_loading()
+        # yield Static("", classes="vertical-spacer-small")
+        yield self.backups_section_heading
+
+        with Vertical():
+            yield self.last_backup_status_label.set_loading()
+            yield self.last_backup_attempt_label.set_loading()
+            yield self.next_backup_label.set_loading()
+
+        yield Static("", classes="vertical-spacer")
 
 
     @work
@@ -98,7 +109,6 @@ class ProjectCard(ProjectCardBase):
             case _:
                 self.set_border_color(Color.Offline)
 
-        labels = self.query(Label)
         for service in SERVICES:
             service_status = service_statuses["services"][service.id]
             
@@ -107,13 +117,12 @@ class ProjectCard(ProjectCardBase):
             else:
                 status = ServiceStatus.as_unhealthy()
 
-            labels[SERVICES.index(service)].update(
-                build_detail_label(service, status.status, status.color)
-            )
+            self.service_labels[service.id].update_detail(status.status, Color(status.color))
 
     async def update_info(self) -> None:
         await self.update_service_statuses()
-        await update_backup_schedule_labels(self)
+        _ = await update_backup_schedule_labels(self)
 
         now = datetime.now()
-        self.set_last_updated_at(now.strftime("%H:%M"))
+        self.services_section_heading.set_updated_at(now)
+        self.backups_section_heading.set_updated_at(now)

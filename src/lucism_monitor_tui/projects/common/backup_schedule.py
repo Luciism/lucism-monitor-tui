@@ -77,7 +77,7 @@ class ProjectCardWithBackupSchedule(Protocol):
 
 async def update_backup_schedule_labels(
     self: ProjectCardWithBackupSchedule,
-) -> None:
+) -> str:
         try:
             self.logger.debug("Starting to fetch backup schedule")
             backup_schedule = await BackupSchedule.fetch_backup_schedule(
@@ -126,3 +126,5 @@ async def update_backup_schedule_labels(
                     Color.Loading
                 )
 
+
+        return backup_schedule.last_backup_status
