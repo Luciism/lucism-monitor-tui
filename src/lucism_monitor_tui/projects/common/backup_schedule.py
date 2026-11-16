@@ -1,10 +1,13 @@
+import typing
+import logging
 from datetime import datetime
 from dataclasses import dataclass
-import logging
 from typing import Protocol
 
 from aiohttp import ClientSession, ClientError
 from pydantic import BaseModel
+
+from lucism_monitor_tui.projects.common.ws_client import WebsocketClient
 
 from ..project_card import LabelWrapper
 from ..style import Color
@@ -18,6 +21,13 @@ class BackupSchedule(BaseModel):
     last_successful_backup_timestamp: int | None
     next_backup: _BackupScheduleNextBackup
     last_backup_status: str
+
+    @staticmethod
+    def from_dict(data: dict[str, typing.Any]) -> 'BackupSchedule | None':
+        try:
+            return BackupSchedule(**data)
+        except TypeError:
+            return None
 
     @staticmethod
     async def fetch_backup_schedule(api_base_url: str, api_key: str) -> 'BackupSchedule':
@@ -74,6 +84,52 @@ class ProjectCardWithBackupSchedule(Protocol):
     logger: logging.Logger
     backup_api_base_url: str
     backup_api_key: str
+
+async def ws_update_backup_schedule_labels(
+    self: ProjectCardWithBackupSchedule,
+    backup_schedule: BackupSchedule | WebsocketClient.InvalidWsResponseSentinel
+)-> None:
+    if isinstance(backup_schedule, WebsocketClient.InvalidWsResponseSentinel):
+        msg = "Error"
+
+        self.next_backup_label.update_detail(msg, Color.Offline)
+        self.last_backup_attempt_label.update_detail(msg, Color.Offline)
+        self.last_backup_status_label.update_detail(msg, Color.Offline)
+        return
+
+    if backup_schedule.next_backup.in_progress:
+        self.next_backup_label.update_detail(
+            "In Progress",
+            Color.Running
+        )
+    else:
+        self.next_backup_label.update_detail(
+            backup_schedule.format_next_backup(),
+            Color.Accent
+        )
+
+    self.last_backup_attempt_label.update_detail(
+        backup_schedule.format_last_successful_backup(),
+        Color.Accent
+    )
+
+    match backup_schedule.last_backup_status:
+        case "created":
+            self.last_backup_status_label.update_detail(
+                "Created",
+                Color.Running
+            )
+        case "failed":
+            self.last_backup_status_label.update_detail(
+                "Failed",
+                Color.Offline
+            )
+        case _:
+            self.last_backup_status_label.update_detail(
+                "Unknown",
+                Color.Loading
+            )
+
 
 async def update_backup_schedule_labels(
     self: ProjectCardWithBackupSchedule,

@@ -1,111 +1,37 @@
-import os
-import json
 import asyncio
 import logging
-import concurrent.futures
+import typing
+from typing import final, override
 from datetime import datetime
-from typing import Any, Callable, final, override
-from collections.abc import Coroutine
 
-import websocket
 from textual import work
-from textual.app import ComposeResult, App
-from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Button, Label, Static, RichLog
+from textual.app import ComposeResult
+from textual.containers import Vertical
+from textual.widgets import Static
 
 from .common.environment import get_and_assert_env
+from .common.ws_client import WebsocketClient
 
 from .style import Color
-from .common.backup_schedule import update_backup_schedule_labels
+from .common.backup_schedule import BackupSchedule, ws_update_backup_schedule_labels
 from .project_card import (
     ProjectCardBase,
     DetailLabelEntry,
     SectionHeading,
-    build_detail_label,
     LabelWrapper,
     ServiceStatus
 )
 
 STATALYTICS_HEALTH_API_BASE_URL = get_and_assert_env("STATALYTICS_HEALTH_API_BASE_URL")
+STATALYTICS_HEALTH_WS_URI = get_and_assert_env("STATALYTICS_HEALTH_WS_URI")
 STATALYTICS_HEALTH_API_KEY = get_and_assert_env("STATALYTICS_HEALTH_API_KEY")
 
 STATALYTICS_BACKUPS_API_BASE_URL = get_and_assert_env("STATALYTICS_BACKUPS_API_BASE_URL")
+STATALYTICS_BACKUPS_WS_URI = get_and_assert_env("STATALYTICS_BACKUPS_WS_URI")
 STATALYTICS_BACKUPS_API_KEY = get_and_assert_env("STATALYTICS_BACKUPS_API_KEY")
 
 type ServiceStatusAlias = dict[str, str | dict[str, str | dict[str, str]]]
 
-@final
-class HealthWebsocketClient(websocket.WebSocketApp):
-    url: str = os.environ["STATALYTICS_HEALTH_WS_URL"]
-
-    def __init__(
-        self,
-        logger: logging.Logger,
-        event_loop: asyncio.AbstractEventLoop,
-        on_status_receive: Callable[[ServiceStatusAlias], Coroutine[Any, Any, None]]
-    ) -> None:
-        self._on_status_receive = on_status_receive
-        self.app_loop = event_loop
-        self.logger: logging.Logger = logger
-
-        headers = {"X-Api-Key": STATALYTICS_HEALTH_API_KEY}
-        super().__init__(
-            self.url,
-            headers,
-            on_message=HealthWebsocketClient.on_message,
-            on_error=HealthWebsocketClient.on_error,
-            on_close=HealthWebsocketClient.on_close,
-            on_open=HealthWebsocketClient.on_open
-        )
-
-
-    @override
-    def on_message(self, message: str) -> None:
-        self.logger.debug("WebSocket message received: %s", message)
-
-        try:
-            status: ServiceStatusAlias = json.loads(message)
-        except json.JSONDecodeError:
-            self.logger.exception("Invalid health WebSocket message")
-            status = {
-                "status": "unhealthy",
-                "timestamp": "none",
-                "services": {
-                    service.id: {"status": "unhealthy"} for service in SERVICES
-                }
-            }
-
-        future = asyncio.run_coroutine_threadsafe(
-            self._on_status_receive(status),
-            self.app_loop,
-        )
-        future.add_done_callback(self._log_callback_error)
-
-    def _log_callback_error(
-        self,
-        future: concurrent.futures.Future[None],
-    ) -> None:
-        try:
-            future.result()
-        except Exception:
-            self.logger.exception("Async status callback failed")
-
-    @override
-    def on_error(self, error: str):
-        self.logger.error(f"Health websocket error: {error}")
-
-    @override
-    def on_close(self, close_status_code: int, close_msg: str):
-        self.logger.info(f"Health websocket closed with code '{close_status_code}': '{close_msg}'")
-
-    @override
-    def on_open(self):
-        self.logger.info("Health websocket connection opened")
-
-    def start(self) -> asyncio.Task[bool]:
-        return asyncio.create_task(asyncio.to_thread(self.run_forever, reconnect=5))
-        # is_alive = self.run_forever(dispatcher=rel, reconnect=5)
-        # rel.dispatch()
 
 
 SERVICES = [
@@ -129,8 +55,6 @@ class ProjectCard(ProjectCardBase):
         super().__init__("Statalytics")
         self.set_border_color(Color.Loading)
 
-        self.update_interval_secs = 5
-
         self.service_labels: dict[str, LabelWrapper] = {
             service.id: LabelWrapper(service) for service in SERVICES
         }
@@ -144,12 +68,23 @@ class ProjectCard(ProjectCardBase):
             DetailLabelEntry("last_backup_attempt", "Last Backup Attempt", "󰥔"))
         self.next_backup_label = LabelWrapper(DetailLabelEntry("next_backup", "Next Backup", "󰥔"))
 
-        self.health_websocket = HealthWebsocketClient(
+        self.health_websocket = WebsocketClient(
+            STATALYTICS_HEALTH_WS_URI,
+            STATALYTICS_HEALTH_API_KEY,
             self.logger,
             asyncio.get_running_loop(),
             self.ws_update_service_statuses
         )
         self.health_websocket_task: asyncio.Task[bool] | None = None
+
+        self.backups_websocket = WebsocketClient(
+            STATALYTICS_BACKUPS_WS_URI,
+            STATALYTICS_BACKUPS_API_KEY,
+            self.logger,
+            asyncio.get_running_loop(),
+            self.ws_update_backup_schedule
+        )
+        self.backups_websocket_task: asyncio.Task[bool] | None = None
 
     @override
     def compose(self) -> ComposeResult:
@@ -159,7 +94,6 @@ class ProjectCard(ProjectCardBase):
             for service in SERVICES:
                 yield self.service_labels[service.id].set_loading()
 
-        # yield Static("", classes="vertical-spacer-small")
         yield self.backups_section_heading
 
         with Vertical():
@@ -170,16 +104,34 @@ class ProjectCard(ProjectCardBase):
 
         yield Static("", classes="vertical-spacer")
 
-        with Horizontal():
-            yield Button("Create Backup", variant="primary")
-            yield Button("Refresh All Info", variant="primary",)
+        # Prototype
+        # with Horizontal():
+        #     yield Button("Create Backup", variant="primary")
+        #     yield Button("Refresh All Info", variant="primary",)
 
     @work
     async def on_mount(self) -> None:
         self.health_websocket_task = self.health_websocket.start()
+        self.backups_websocket_task = self.backups_websocket.start()
 
+    @work
+    async def on_unmount(self) -> None:
+        self.health_websocket.close()
+        self.backups_websocket.close()
 
-    async def ws_update_service_statuses(self, services_status: ServiceStatusAlias) -> None:
+    async def ws_update_service_statuses(
+        self,
+        services_status: ServiceStatusAlias | WebsocketClient.InvalidWsResponseSentinel
+    ) -> None:
+        if isinstance(services_status, WebsocketClient.InvalidWsResponseSentinel):
+            services_status = {
+                "status": "unhealthy",
+                "timestamp": "none",
+                "services": {
+                    service.id: {"status": "unhealthy"} for service in SERVICES
+                }
+            }
+
         overall_health = services_status["status"]
 
         match overall_health:
@@ -198,12 +150,20 @@ class ProjectCard(ProjectCardBase):
                 status = ServiceStatus.as_unhealthy()
 
             self.service_labels[service.id].update_detail(status.status, Color(status.color))
+        
+        self.services_section_heading.set_updated_at(datetime.now())
+        
+    async def ws_update_backup_schedule(
+        self,
+        backup_schedule: dict[str, typing.Any] | WebsocketClient.InvalidWsResponseSentinel
+    ) -> None:
+        try:
+            if isinstance(backup_schedule, dict):
+                backup_schedule = BackupSchedule(**backup_schedule)
+        except TypeError:
+            backup_schedule = WebsocketClient.INVALID_WS_RESPONSE_SENTINEL
 
-        # TODO: use websocket
-        _ = await update_backup_schedule_labels(self)
+        await ws_update_backup_schedule_labels(self, backup_schedule)
 
-        now = datetime.now()
-
-        self.services_section_heading.set_updated_at(now)
-        self.backups_section_heading.set_updated_at(now)
+        self.backups_section_heading.set_updated_at(datetime.now())
 
