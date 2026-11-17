@@ -1,3 +1,5 @@
+import typing
+import asyncio
 import logging
 from datetime import datetime
 from typing import final, override
@@ -5,13 +7,14 @@ from typing import final, override
 from aiohttp import ClientError
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical
+from textual.containers import Vertical
 from textual.widgets import Static
 
-from .common.backup_schedule import update_backup_schedule_labels
-
+from .common.backup_schedule import ws_update_backup_schedule_labels
+from .common.ws_client import WebsocketClient
 from .common.mc_metrics import McServerMetrics
 from .common.environment import get_and_assert_env
+
 from .style import Color
 from .project_card import ProjectCardBase, LabelWrapper, DetailLabelEntry, SectionHeading
 
@@ -21,6 +24,7 @@ DARK_SMP_METRICS_SERVER_API_KEY = get_and_assert_env("DARK_SMP_METRICS_SERVER_AP
 
 DARK_SMP_BACKUPS_API_BASE_URL = get_and_assert_env("DARK_SMP_BACKUPS_API_BASE_URL")
 DARK_SMP_BACKUPS_API_KEY = get_and_assert_env("DARK_SMP_BACKUPS_API_KEY")
+DARK_SMP_BACKUPS_WS_URI = get_and_assert_env("DARK_SMP_BACKUPS_WS_URI")
 
 
 @final
@@ -52,6 +56,16 @@ class ProjectCard(ProjectCardBase):
             DetailLabelEntry("last_backup_attempt", "Last Backup Attempt", "󰥔"))
         self.next_backup_label = LabelWrapper(DetailLabelEntry("next_backup", "Next Backup", "󰥔"))
 
+        self.backups_websocket = WebsocketClient(
+            DARK_SMP_BACKUPS_WS_URI,
+            DARK_SMP_BACKUPS_API_KEY,
+            self.logger,
+            asyncio.get_running_loop(),
+            self.ws_update_backup_schedule
+        )
+        self.backups_websocket_task: asyncio.Task[bool] | None = None
+
+
     @override
     def compose(self) -> ComposeResult:
         yield self.metrics_section_heading
@@ -77,6 +91,14 @@ class ProjectCard(ProjectCardBase):
     async def on_mount(self) -> None:
         await self.update_info()
         _ = self.set_interval(self.update_interval_secs, self.update_info)
+
+        # self.health_websocket_task = self.health_websocket.start()
+        self.backups_websocket_task = self.backups_websocket.start()
+
+    @work
+    async def on_unmount(self) -> None:
+        # self.health_websocket.close()
+        self.backups_websocket.close()
 
     async def update_server_metrics(self) -> None:
         try:
@@ -122,8 +144,12 @@ class ProjectCard(ProjectCardBase):
 
     async def update_info(self) -> None:
         await self.update_server_metrics()
-        _ = await update_backup_schedule_labels(self)
+        self.metrics_section_heading.set_updated_at(datetime.now())
 
-        now = datetime.now()
-        self.metrics_section_heading.set_updated_at(now)
-        self.backups_section_heading.set_updated_at(now)
+
+    async def ws_update_backup_schedule(
+        self,
+        backup_schedule: dict[str, typing.Any] | WebsocketClient.InvalidWsResponseSentinel
+    ) -> None:
+        await ws_update_backup_schedule_labels(self, backup_schedule)
+        self.backups_section_heading.set_updated_at(datetime.now())
