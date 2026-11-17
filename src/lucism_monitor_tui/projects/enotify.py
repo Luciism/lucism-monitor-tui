@@ -1,27 +1,28 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import final, override
 
-from aiohttp import ClientSession, ClientError
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical
-from textual.widgets import Label, Static
+from textual.containers import Vertical
+from textual.widgets import Static
 
 from .common.environment import get_and_assert_env
+from .common.ws_client import WebsocketClient
 
 from .style import Color
 from .project_card import (
     ProjectCardBase,
     DetailLabelEntry,
     SectionHeading,
-    build_detail_label,
     LabelWrapper,
     ServiceStatus
 )
 
 ENOTIFY_HEALTH_API_BASE_URL = get_and_assert_env("ENOTIFY_HEALTH_API_BASE_URL")
 ENOTIFY_HEALTH_API_KEY = get_and_assert_env("ENOTIFY_HEALTH_API_KEY")
+ENOTIFY_HEALTH_WS_URI = get_and_assert_env("ENOTIFY_HEALTH_WS_URI")
 
 ENOTIFY_BACKUPS_API_BASE_URL = get_and_assert_env("ENOTIFY_BACKUPS_API_BASE_URL")
 ENOTIFY_BACKUPS_API_KEY = get_and_assert_env("ENOTIFY_BACKUPS_API_KEY")
@@ -50,6 +51,16 @@ class ProjectCard(ProjectCardBase):
 
         self.services_section_heading = SectionHeading("Services")
 
+        self.health_websocket = WebsocketClient(
+            ENOTIFY_HEALTH_WS_URI,
+            ENOTIFY_HEALTH_API_KEY,
+            self.logger,
+            asyncio.get_running_loop(),
+            self.ws_update_service_statuses
+        )
+        self.health_websocket_task: asyncio.Task[bool] | None = None
+
+
     @override
     def compose(self) -> ComposeResult:
         yield self.services_section_heading
@@ -63,23 +74,19 @@ class ProjectCard(ProjectCardBase):
 
     @work
     async def on_mount(self) -> None:
-        await self.update_info()
-        _ = self.set_interval(self.update_interval_secs, self.update_info)
+        self.health_websocket_task = self.health_websocket.start()
 
-    async def get_service_status(self) -> dict[str, dict[str, str]]:
-        try:
-            async with ClientSession(raise_for_status=True) as session:
-                res = await session.get(
-                    f"{ENOTIFY_HEALTH_API_BASE_URL}/health",
-                    headers={
-                        "X-Api-Key": ENOTIFY_HEALTH_API_KEY
-                    })
-                return await res.json()
-        except ClientError:
-            return { "services": { service.id: "unhealthy" for service in SERVICES } }
+    @work
+    async def on_unmount(self) -> None:
+        self.health_websocket.close()
 
-    async def update_service_statuses(self) -> None:
-        service_statuses = await self.get_service_status()
+    async def ws_update_service_statuses(
+        self,
+        service_statuses: dict[str, dict[str, str]] | WebsocketClient.InvalidWsResponseSentinel
+    ) -> None:
+        if isinstance(service_statuses, WebsocketClient.InvalidWsResponseSentinel):
+            service_statuses = { "services": { service.id: "unhealthy" for service in SERVICES } }
+
         total_services = len(service_statuses["services"])
         healthy_services = len([s for s in service_statuses["services"].values() if s == "healthy"])
 
@@ -102,6 +109,4 @@ class ProjectCard(ProjectCardBase):
 
             self.service_labels[service.id].update_detail(status.status, Color(status.color))
 
-    async def update_info(self) -> None:
-        await self.update_service_statuses()
         self.services_section_heading.set_updated_at(datetime.now())
