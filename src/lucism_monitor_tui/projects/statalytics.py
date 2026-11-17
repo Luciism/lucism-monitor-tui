@@ -157,13 +157,6 @@ class ProjectCard(ProjectCardBase):
         self,
         backup_schedule: dict[str, typing.Any] | WebsocketClient.InvalidWsResponseSentinel
     ) -> None:
-        try:
-            if isinstance(backup_schedule, dict):
-                backup_schedule = BackupSchedule(**backup_schedule)
-        except TypeError:
-            backup_schedule = WebsocketClient.INVALID_WS_RESPONSE_SENTINEL
-
         await ws_update_backup_schedule_labels(self, backup_schedule)
-
         self.backups_section_heading.set_updated_at(datetime.now())
 

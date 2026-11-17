@@ -87,8 +87,14 @@ class ProjectCardWithBackupSchedule(Protocol):
 
 async def ws_update_backup_schedule_labels(
     self: ProjectCardWithBackupSchedule,
-    backup_schedule: BackupSchedule | WebsocketClient.InvalidWsResponseSentinel
+    backup_schedule: dict[str, typing.Any] | WebsocketClient.InvalidWsResponseSentinel
 )-> None:
+    try:
+        if isinstance(backup_schedule, dict):
+            backup_schedule = BackupSchedule(**backup_schedule)
+    except TypeError:
+        backup_schedule = WebsocketClient.INVALID_WS_RESPONSE_SENTINEL
+
     if isinstance(backup_schedule, WebsocketClient.InvalidWsResponseSentinel):
         msg = "Error"
 

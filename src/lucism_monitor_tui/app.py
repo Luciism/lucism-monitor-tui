@@ -152,11 +152,10 @@ class ServiceDashboard(App[None]):
         {Color.bg_classes()}
     """
 
-    BINDINGS = [("^q", "quit", "Quit")]
+    BINDINGS = [("^q", "quit", "Quit"), ("^c", "quit", "Quit")]
 
     @override
     def compose(self) -> ComposeResult:
-        # yield Header(show_clock=True)
         yield Button("", classes="pre-selected-button")
         with Container(id="grid"):
             yield statalytics.ProjectCard()
@@ -164,7 +163,6 @@ class ServiceDashboard(App[None]):
             yield enotify.ProjectCard()
             yield dark_smp.ProjectCard()
 
-        # yield Footer()
 
 
 app = ServiceDashboard()
