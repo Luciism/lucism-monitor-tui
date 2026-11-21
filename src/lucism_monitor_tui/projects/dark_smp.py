@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 from typing import final, override
 
-from aiohttp import ClientError
 from textual import work
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -12,33 +11,27 @@ from textual.widgets import Static
 
 from .common.backup_schedule import ws_update_backup_schedule_labels
 from .common.ws_client import WebsocketClient
-from .common.mc_metrics import McServerMetrics
+from .common.mc_metrics import McServerMetricsData
 from .common.environment import get_and_assert_env
 
 from .style import Color
 from .project_card import ProjectCardBase, LabelWrapper, DetailLabelEntry, SectionHeading
 
 
-DARK_SMP_METRICS_SERVER_BASE_URL = get_and_assert_env("DARK_SMP_METRICS_SERVER_BASE_URL")
 DARK_SMP_METRICS_SERVER_API_KEY = get_and_assert_env("DARK_SMP_METRICS_SERVER_API_KEY")
+DARK_SMP_METRICS_WS_URI = get_and_assert_env("DARK_SMP_METRICS_WS_URI")
 
-DARK_SMP_BACKUPS_API_BASE_URL = get_and_assert_env("DARK_SMP_BACKUPS_API_BASE_URL")
 DARK_SMP_BACKUPS_API_KEY = get_and_assert_env("DARK_SMP_BACKUPS_API_KEY")
 DARK_SMP_BACKUPS_WS_URI = get_and_assert_env("DARK_SMP_BACKUPS_WS_URI")
 
 
 @final
 class ProjectCard(ProjectCardBase):
-    backup_api_base_url = DARK_SMP_BACKUPS_API_BASE_URL 
-    backup_api_key = DARK_SMP_BACKUPS_API_KEY
     logger = logging.getLogger("projects.dark_smp")
 
 
     def __init__(self) -> None:
         super().__init__("Dark SMP")
-
-        self.update_interval_secs = 5
-        self.next_backup_time: datetime | None = None
 
         self.metrics_section_heading = SectionHeading("Metrics")
         self.backups_section_heading = SectionHeading("Backups")
@@ -55,6 +48,16 @@ class ProjectCard(ProjectCardBase):
         self.last_backup_attempt_label = LabelWrapper(
             DetailLabelEntry("last_backup_attempt", "Last Backup Attempt", "󰥔"))
         self.next_backup_label = LabelWrapper(DetailLabelEntry("next_backup", "Next Backup", "󰥔"))
+
+
+        self.health_websocket = WebsocketClient(
+            DARK_SMP_METRICS_WS_URI,
+            DARK_SMP_METRICS_SERVER_API_KEY,
+            self.logger,
+            asyncio.get_running_loop(),
+            self.ws_update_server_metrics
+        )
+        self.health_websocket_task: asyncio.Task[bool] | None = None
 
         self.backups_websocket = WebsocketClient(
             DARK_SMP_BACKUPS_WS_URI,
@@ -89,25 +92,23 @@ class ProjectCard(ProjectCardBase):
 
     @work
     async def on_mount(self) -> None:
-        await self.update_info()
-        _ = self.set_interval(self.update_interval_secs, self.update_info)
-
-        # self.health_websocket_task = self.health_websocket.start()
+        self.health_websocket_task = self.health_websocket.start()
         self.backups_websocket_task = self.backups_websocket.start()
 
     @work
     async def on_unmount(self) -> None:
-        # self.health_websocket.close()
+        self.health_websocket.close()
         self.backups_websocket.close()
 
-    async def update_server_metrics(self) -> None:
-        try:
-            metrics = await McServerMetrics(
-                DARK_SMP_METRICS_SERVER_BASE_URL, DARK_SMP_METRICS_SERVER_API_KEY
-            ).get_current_metrics()
-        except ClientError as exc:
-            self.logger.error("Failed to get metrics", exc_info=exc)
+
+    async def ws_update_server_metrics(
+        self,
+        metrics_json: typing.Any | WebsocketClient.InvalidWsResponseSentinel
+    ) -> None:
+        if isinstance(metrics_json, WebsocketClient.InvalidWsResponseSentinel):
             metrics = None
+        else:
+            metrics = McServerMetricsData.model_validate(metrics_json)
 
         if metrics:
             if metrics.tps >= 19:
@@ -141,9 +142,6 @@ class ProjectCard(ProjectCardBase):
             self.loaded_chunks_label.update_detail("N/A", Color.Offline)
             self.memory_label.update_detail("N/A", Color.Offline)
 
-
-    async def update_info(self) -> None:
-        await self.update_server_metrics()
         self.metrics_section_heading.set_updated_at(datetime.now())
 
 

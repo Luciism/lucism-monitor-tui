@@ -82,8 +82,6 @@ class ProjectCardWithBackupSchedule(Protocol):
     next_backup_label: LabelWrapper
 
     logger: logging.Logger
-    backup_api_base_url: str
-    backup_api_key: str
 
 async def ws_update_backup_schedule_labels(
     self: ProjectCardWithBackupSchedule,
@@ -137,56 +135,3 @@ async def ws_update_backup_schedule_labels(
             )
 
 
-async def update_backup_schedule_labels(
-    self: ProjectCardWithBackupSchedule,
-) -> str:
-        try:
-            self.logger.debug("Starting to fetch backup schedule")
-            backup_schedule = await BackupSchedule.fetch_backup_schedule(
-                self.backup_api_base_url, self.backup_api_key
-            )
-            self.logger.debug("Backup schedule fetched")
-        except ClientError as exc:
-            self.logger.error("Failed to get backup schedule", exc_info=exc)
-            msg = "Fetch failed"
-
-            self.next_backup_label.update_detail(msg, Color.Offline)
-            self.last_backup_attempt_label.update_detail(msg, Color.Offline)
-            self.last_backup_status_label.update_detail(msg, Color.Offline)
-            return
-
-        if backup_schedule.next_backup.in_progress:
-            self.next_backup_label.update_detail(
-                "In Progress",
-                Color.Running
-            )
-        else:
-            self.next_backup_label.update_detail(
-                backup_schedule.format_next_backup(),
-                Color.Accent
-            )
-
-        self.last_backup_attempt_label.update_detail(
-            backup_schedule.format_last_successful_backup(),
-            Color.Accent
-        )
-
-        match backup_schedule.last_backup_status:
-            case "created":
-                self.last_backup_status_label.update_detail(
-                    "Created",
-                    Color.Running
-                )
-            case "failed":
-                self.last_backup_status_label.update_detail(
-                    "Failed",
-                    Color.Offline
-                )
-            case _:
-                self.last_backup_status_label.update_detail(
-                    "Unknown",
-                    Color.Loading
-                )
-
-
-        return backup_schedule.last_backup_status
