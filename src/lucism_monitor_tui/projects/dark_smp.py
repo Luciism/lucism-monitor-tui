@@ -50,14 +50,14 @@ class ProjectCard(ProjectCardBase):
         self.next_backup_label = LabelWrapper(DetailLabelEntry("next_backup", "Next Backup", "󰥔"))
 
 
-        self.health_websocket = WebsocketClient(
+        self.metrics_websocket = WebsocketClient(
             DARK_SMP_METRICS_WS_URI,
             DARK_SMP_METRICS_SERVER_API_KEY,
             self.logger,
             asyncio.get_running_loop(),
             self.ws_update_server_metrics
         )
-        self.health_websocket_task: asyncio.Task[bool] | None = None
+        self.metrics_websocket_task: asyncio.Task[bool] | None = None
 
         self.backups_websocket = WebsocketClient(
             DARK_SMP_BACKUPS_WS_URI,
@@ -92,12 +92,12 @@ class ProjectCard(ProjectCardBase):
 
     @work
     async def on_mount(self) -> None:
-        self.health_websocket_task = self.health_websocket.start()
+        self.metrics_websocket_task = self.metrics_websocket.start()
         self.backups_websocket_task = self.backups_websocket.start()
 
     @work
     async def on_unmount(self) -> None:
-        self.health_websocket.close()
+        self.metrics_websocket.close()
         self.backups_websocket.close()
 
 

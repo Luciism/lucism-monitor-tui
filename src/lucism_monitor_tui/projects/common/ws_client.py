@@ -37,7 +37,8 @@ class WebsocketClient(websocket.WebSocketApp):
             on_message=WebsocketClient.on_message,
             on_error=WebsocketClient.on_error,
             on_close=WebsocketClient.on_close,
-            on_open=WebsocketClient.on_open
+            on_open=WebsocketClient.on_open,
+            on_reconnect=WebsocketClient.on_reconnect
         )
 
 
@@ -70,9 +71,19 @@ class WebsocketClient(websocket.WebSocketApp):
     def on_error(self, error: str):
         self.logger.error(f"Health websocket error: {error}")
 
+        future = asyncio.run_coroutine_threadsafe(
+            self._on_status_receive(self.INVALID_WS_RESPONSE_SENTINEL),
+            self.app_loop,
+        )
+        future.add_done_callback(self._log_callback_error)
+
     @override
     def on_close(self, close_status_code: int, close_msg: str):
         self.logger.info(f"Health websocket closed with code '{close_status_code}': '{close_msg}'")
+
+    @override
+    def on_reconnect(self):
+        pass
 
     @override
     def on_open(self):
