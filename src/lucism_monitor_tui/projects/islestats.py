@@ -22,11 +22,9 @@ from .project_card import (
     ServiceStatus
 )
 
-ISLESTATS_HEALTH_API_BASE_URL = get_and_assert_env("ISLESTATS_HEALTH_API_BASE_URL")
 ISLESTATS_HEALTH_API_KEY = get_and_assert_env("ISLESTATS_HEALTH_API_KEY")
 ISLESTATS_HEALTH_WS_URI = get_and_assert_env("ISLESTATS_HEALTH_WS_URI")
 
-ISLESTATS_BACKUPS_API_BASE_URL = get_and_assert_env("ISLESTATS_BACKUPS_API_BASE_URL")
 ISLESTATS_BACKUPS_API_KEY = get_and_assert_env("ISLESTATS_BACKUPS_API_KEY")
 ISLESTATS_BACKUPS_WS_URI = get_and_assert_env("ISLESTATS_BACKUPS_WS_URI")
 
@@ -41,14 +39,10 @@ SERVICES = [
 
 @final
 class ProjectCard(ProjectCardBase):
-    backup_api_base_url = ISLESTATS_BACKUPS_API_BASE_URL
-    backup_api_key = ISLESTATS_BACKUPS_API_KEY
     logger = logging.getLogger("projects.islestats")
 
     def __init__(self) -> None:
         super().__init__("IsleStats")
-
-        self.update_interval_secs = 5
 
         self.service_labels: dict[str, LabelWrapper] = {
             service.id: LabelWrapper(service) for service in SERVICES

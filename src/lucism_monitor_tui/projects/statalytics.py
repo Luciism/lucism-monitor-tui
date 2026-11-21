@@ -13,7 +13,7 @@ from .common.environment import get_and_assert_env
 from .common.ws_client import WebsocketClient
 
 from .style import Color
-from .common.backup_schedule import BackupSchedule, ws_update_backup_schedule_labels
+from .common.backup_schedule import ws_update_backup_schedule_labels
 from .project_card import (
     ProjectCardBase,
     DetailLabelEntry,
@@ -22,16 +22,13 @@ from .project_card import (
     ServiceStatus
 )
 
-STATALYTICS_HEALTH_API_BASE_URL = get_and_assert_env("STATALYTICS_HEALTH_API_BASE_URL")
 STATALYTICS_HEALTH_WS_URI = get_and_assert_env("STATALYTICS_HEALTH_WS_URI")
 STATALYTICS_HEALTH_API_KEY = get_and_assert_env("STATALYTICS_HEALTH_API_KEY")
 
-STATALYTICS_BACKUPS_API_BASE_URL = get_and_assert_env("STATALYTICS_BACKUPS_API_BASE_URL")
 STATALYTICS_BACKUPS_WS_URI = get_and_assert_env("STATALYTICS_BACKUPS_WS_URI")
 STATALYTICS_BACKUPS_API_KEY = get_and_assert_env("STATALYTICS_BACKUPS_API_KEY")
 
 type ServiceStatusAlias = dict[str, str | dict[str, str | dict[str, str]]]
-
 
 
 SERVICES = [
@@ -47,13 +44,11 @@ SERVICES = [
 
 @final
 class ProjectCard(ProjectCardBase):
-    backup_api_base_url = STATALYTICS_BACKUPS_API_BASE_URL
-    backup_api_key = STATALYTICS_BACKUPS_API_KEY
     logger = logging.getLogger("projects.statalytics")
 
     def __init__(self) -> None:
         super().__init__("Statalytics")
-        self.set_border_color(Color.Loading)
+        # self.set_border_color(Color.Loading)
 
         self.service_labels: dict[str, LabelWrapper] = {
             service.id: LabelWrapper(service) for service in SERVICES

@@ -20,12 +20,8 @@ from .project_card import (
     ServiceStatus
 )
 
-ENOTIFY_HEALTH_API_BASE_URL = get_and_assert_env("ENOTIFY_HEALTH_API_BASE_URL")
 ENOTIFY_HEALTH_API_KEY = get_and_assert_env("ENOTIFY_HEALTH_API_KEY")
 ENOTIFY_HEALTH_WS_URI = get_and_assert_env("ENOTIFY_HEALTH_WS_URI")
-
-ENOTIFY_BACKUPS_API_BASE_URL = get_and_assert_env("ENOTIFY_BACKUPS_API_BASE_URL")
-ENOTIFY_BACKUPS_API_KEY = get_and_assert_env("ENOTIFY_BACKUPS_API_KEY")
 
 
 SERVICES = [
@@ -36,14 +32,10 @@ SERVICES = [
 
 @final
 class ProjectCard(ProjectCardBase):
-    backup_api_base_url = ENOTIFY_BACKUPS_API_BASE_URL
-    backup_api_key = ENOTIFY_BACKUPS_API_KEY
     logger = logging.getLogger("projects.enotify")
 
     def __init__(self) -> None:
         super().__init__("Enotify")
-
-        self.update_interval_secs = 5
 
         self.service_labels: dict[str, LabelWrapper] = {
             service.id: LabelWrapper(service) for service in SERVICES
