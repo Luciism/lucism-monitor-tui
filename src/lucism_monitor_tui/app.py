@@ -1,3 +1,4 @@
+import os
 import logging
 import argparse
 from pathlib import Path
@@ -28,6 +29,10 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
+_is_exit_allowed = os.getenv("ALLOW_EXIT", "1")
+IS_EXIT_ALLOWED = int(_is_exit_allowed) if _is_exit_allowed.isnumeric() else 1
+logging.info(f"IS_EXIT_ALLOWED: {type(IS_EXIT_ALLOWED)}({IS_EXIT_ALLOWED})")
+
 @final
 class PlaceholderServiceCard(Static):
     """One bordered panel representing a single service's status."""
@@ -57,6 +62,17 @@ class PlaceholderServiceCard(Static):
 class ServiceDashboard(App[None]):
     """A grid of service status panels, similar in spirit to the screenshot."""
 
+    def __init__(self):
+        super().__init__()
+    _inherit_bindings = False
+
+    @override
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if not IS_EXIT_ALLOWED and action in ("quit", "help_quit"):
+            return False
+
+        return super().check_action(action, parameters)
+    
     CSS: str = f"""
         Screen {{
             background: {Color.Background.value};
@@ -151,8 +167,6 @@ class ServiceDashboard(App[None]):
         {Color.border_classes()}
         {Color.bg_classes()}
     """
-
-    BINDINGS = [("^q", "quit", "Quit"), ("^c", "quit", "Quit")]
 
     @override
     def compose(self) -> ComposeResult:
